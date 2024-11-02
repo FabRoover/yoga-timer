@@ -26,14 +26,44 @@ jobs:
       with:
         python-version: '3.9'
     
-    - name: Install dependencies
+    - name: Install system dependencies
       run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          python3-pip \
+          git \
+          wget \
+          unzip \
+          android-tools-adb \
+          android-tools-fastboot \
+          autoconf \
+          automake \
+          libtool \
+          build-essential \
+          pkg-config \
+          zlib1g-dev \
+          libncurses5-dev \
+          libncursesw5-dev \
+          libtinfo5 \
+          cmake \
+          libffi-dev \
+          libssl-dev \
+          libsdl2-dev \
+          libsdl2-image-dev \
+          libsdl2-mixer-dev \
+          libsdl2-ttf-dev \
+          libportmidi-dev \
+          libswscale-dev \
+          libavformat-dev \
+          libavcodec-dev \
+          virtualenv
+        
+        # Verify git installation
+        git --version
+        
+        # Install Python packages
         python -m pip install --upgrade pip
-        pip install buildozer Cython==0.29.33
-        sudo apt-get install -y git zip unzip python3-pip autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev
-        sudo apt-get install -y libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev
-        sudo apt-get install -y libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev zlib1g-dev
-        sudo apt-get install -y android-tools-adb android-tools-fastboot
+        pip install buildozer==1.5.0 Cython==0.29.33
     
     - name: Setup Android SDK
       run: |
@@ -65,12 +95,16 @@ jobs:
             "extras;android;m2repository" \
             "extras;google;m2repository"
         
+        # Set permissions
+        sudo chown -R $USER:$USER ${ANDROID_HOME}
+        
         # Verify installation
+        echo "Verifying Android SDK installation..."
         ls -la ${ANDROID_HOME}/tools/bin/sdkmanager
         ls -la ${ANDROID_HOME}/platform-tools/
         ls -la ${ANDROID_HOME}/build-tools/33.0.0/
     
-    - name: Set up buildozer
+    - name: Create buildozer.spec
       run: |
         echo '[app]' > buildozer.spec
         echo 'title = Yoga Timer' >> buildozer.spec
@@ -99,20 +133,29 @@ jobs:
         echo 'log_level = 2' >> buildozer.spec
         echo 'warn_on_root = 1' >> buildozer.spec
     
+    - name: Verify environment
+      run: |
+        echo "Checking git installation:"
+        which git
+        git --version
+        
+        echo "Checking buildozer installation:"
+        which buildozer
+        buildozer --version
+        
+        echo "Checking Java installation:"
+        java -version
+        echo "JAVA_HOME: $JAVA_HOME"
+        
+        echo "Checking Android SDK:"
+        echo "ANDROID_HOME: $ANDROID_HOME"
+        ls -la $ANDROID_HOME
+    
     - name: Build with Buildozer
       env:
         PATH: ${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools:${PATH}
       run: |
-        export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
         export PATH=$JAVA_HOME/bin:$PATH
-        
-        echo "Java version:"
-        java -version
-        
-        echo "ANDROID_HOME: ${ANDROID_HOME}"
-        echo "JAVA_HOME: ${JAVA_HOME}"
-        echo "PATH: $PATH"
-        
         buildozer android debug -v
     
     - name: Upload APK
