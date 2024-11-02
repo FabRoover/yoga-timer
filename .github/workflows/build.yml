@@ -38,26 +38,50 @@ jobs:
         ANDROID_SDK_ROOT="/usr/local/lib/android/sdk"
         CMDLINE_TOOLS_ROOT="${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin"
         
-        # Download and install command line tools
-        wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
+        sudo wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
         sudo mkdir -p ${ANDROID_SDK_ROOT}/cmdline-tools
         sudo unzip -q commandlinetools-linux-9477386_latest.zip -d ${ANDROID_SDK_ROOT}/cmdline-tools
         sudo mv ${ANDROID_SDK_ROOT}/cmdline-tools/cmdline-tools ${ANDROID_SDK_ROOT}/cmdline-tools/latest
         
-        # Set environment variables
         export ANDROID_HOME=${ANDROID_SDK_ROOT}
         export PATH=${PATH}:${CMDLINE_TOOLS_ROOT}
         
-        # Accept licenses and install required components
         yes | sudo ${CMDLINE_TOOLS_ROOT}/sdkmanager --licenses
         sudo ${CMDLINE_TOOLS_ROOT}/sdkmanager --install "build-tools;33.0.0" "platforms;android-33" "platform-tools"
+    
+    - name: Set up buildozer
+      run: |
+        # Create buildozer directories with correct permissions
+        mkdir -p $HOME/.buildozer
+        sudo chown -R $USER:$USER $HOME/.buildozer
         
-        # Create symlinks for buildtools
-        sudo mkdir -p ~/.buildozer/android/platform/android-sdk/build-tools
-        sudo ln -s ${ANDROID_SDK_ROOT}/build-tools/33.0.0 ~/.buildozer/android/platform/android-sdk/build-tools/33.0.0
-        
-        # Verify installation
-        ls -la ~/.buildozer/android/platform/android-sdk/build-tools/33.0.0/aidl || true
+        # Update buildozer.spec
+        cat > buildozer.spec << 'SPEC'
+[app]
+title = Yoga Timer
+package.name = yogatimer
+package.domain = org.example
+source.dir = .
+source.include_exts = py,wav
+version = 0.1
+
+requirements = python3,kivy,plyer,android,Cython==0.29.33
+
+android.permissions = INTERNET,WRITE_EXTERNAL_STORAGE
+p4a.bootstrap = sdl2
+android.archs = arm64-v8a
+android.api = 33
+android.minapi = 21
+android.ndk = 25b
+
+android.presplash_color = #FFFFFF
+android.orientation = portrait
+
+[buildozer]
+log_level = 2
+warn_on_root = 1
+build_dir = $HOME/.buildozer
+SPEC
     
     - name: Build with Buildozer
       run: |
