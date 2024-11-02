@@ -30,18 +30,41 @@ jobs:
     - name: Install system dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y git zip unzip openjdk-11-jdk python3-pip autoconf libtool pkg-config
-        sudo apt-get install -y zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev
-        sudo apt-get install -y libssl-dev libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev
-        sudo apt-get install -y libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev virtualenv
-        sudo apt-get install -y build-essential ccache
+        sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+          git \
+          zip \
+          unzip \
+          python3-pip \
+          autoconf \
+          libtool \
+          pkg-config \
+          zlib1g-dev \
+          libncurses5-dev \
+          libncursesw5-dev \
+          libtinfo5 \
+          cmake \
+          libffi-dev \
+          libssl-dev \
+          libsdl2-dev \
+          libsdl2-image-dev \
+          libsdl2-mixer-dev \
+          libsdl2-ttf-dev \
+          libportmidi-dev \
+          libswscale-dev \
+          libavformat-dev \
+          libavcodec-dev \
+          virtualenv \
+          build-essential \
+          ccache
         
-        sudo ln -sf $(which git) /usr/bin/git
-        which git
+        # Verify git installation
         git --version
         
+        # Install Python packages
         python -m pip install --upgrade pip
         pip install --upgrade Cython==0.29.33 buildozer==1.5.0
+        
+        # Verify buildozer installation
         buildozer --version
 
     - name: Setup Android SDK
@@ -112,7 +135,6 @@ jobs:
 
     - name: Build APK
       run: |
-        export PATH="/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:$PATH"
         buildozer android debug -v
 
     - name: Upload APK
