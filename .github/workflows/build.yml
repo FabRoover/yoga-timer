@@ -36,42 +36,39 @@ jobs:
     - name: Setup Android SDK and Build Tools
       run: |
         # Set up Android SDK
-        ANDROID_SDK_ROOT="/usr/local/lib/android/sdk"
         BUILD_TOOLS_VERSION="33.0.0"
+        ANDROID_HOME="$HOME/.buildozer/android/platform/android-sdk"
         
-        # Create buildozer directory structure
-        mkdir -p $HOME/.buildozer/android/platform/android-sdk/{tools,platforms,platform-tools,build-tools/${BUILD_TOOLS_VERSION}}
+        # Create directory structure
+        mkdir -p ${ANDROID_HOME}/{tools,platforms,platform-tools,build-tools/${BUILD_TOOLS_VERSION}}
         
-        # Download SDK tools
+        # Download and set up command line tools
         wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
         unzip -q commandlinetools-linux-9477386_latest.zip
+        mv cmdline-tools/* ${ANDROID_HOME}/tools/
+        rm -rf cmdline-tools
         
-        # Move tools to correct location
-        mv cmdline-tools $HOME/.buildozer/android/platform/android-sdk/
-        mv $HOME/.buildozer/android/platform/android-sdk/cmdline-tools $HOME/.buildozer/android/platform/android-sdk/tools
+        # Make sdkmanager executable and create bin directory
+        mkdir -p ${ANDROID_HOME}/tools/bin
+        mv ${ANDROID_HOME}/tools/bin/sdkmanager ${ANDROID_HOME}/tools/bin/
+        chmod +x ${ANDROID_HOME}/tools/bin/sdkmanager
         
-        # Copy existing SDK components
-        sudo cp -r ${ANDROID_SDK_ROOT}/build-tools/${BUILD_TOOLS_VERSION}/* $HOME/.buildozer/android/platform/android-sdk/build-tools/${BUILD_TOOLS_VERSION}/
-        sudo cp -r ${ANDROID_SDK_ROOT}/platforms/* $HOME/.buildozer/android/platform/android-sdk/platforms/
-        sudo cp -r ${ANDROID_SDK_ROOT}/platform-tools/* $HOME/.buildozer/android/platform/android-sdk/platform-tools/
+        # Set environment variables
+        export ANDROID_HOME=${ANDROID_HOME}
+        export PATH=${PATH}:${ANDROID_HOME}/tools/bin
         
-        # Create tools/bin directory and copy sdkmanager
-        mkdir -p $HOME/.buildozer/android/platform/android-sdk/tools/bin
-        sudo cp ${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager $HOME/.buildozer/android/platform/android-sdk/tools/bin/
+        # Accept licenses and install components
+        yes | ${ANDROID_HOME}/tools/bin/sdkmanager --licenses || true
+        ${ANDROID_HOME}/tools/bin/sdkmanager --update
+        ${ANDROID_HOME}/tools/bin/sdkmanager "platform-tools" "build-tools;${BUILD_TOOLS_VERSION}" "platforms;android-33"
         
         # Set permissions
         sudo chown -R $USER:$USER $HOME/.buildozer
         
-        # Make sdkmanager executable
-        chmod +x $HOME/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager
-        
-        # Set environment variables
-        export ANDROID_HOME=$HOME/.buildozer/android/platform/android-sdk
-        export PATH=$PATH:$ANDROID_HOME/tools/bin
-        
         # Verify installations
-        ls -la $HOME/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager
-        ls -la $HOME/.buildozer/android/platform/android-sdk/build-tools/${BUILD_TOOLS_VERSION}/aidl
+        ls -la ${ANDROID_HOME}/tools/bin/sdkmanager
+        ls -la ${ANDROID_HOME}/platform-tools/adb
+        ls -la ${ANDROID_HOME}/build-tools/${BUILD_TOOLS_VERSION}/aidl
     
     - name: Set up buildozer
       run: |
