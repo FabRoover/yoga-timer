@@ -11,14 +11,15 @@ jobs:
     runs-on: ubuntu-latest
     env:
       ANDROID_HOME: /home/runner/.buildozer/android/platform/android-sdk
+      JAVA_HOME: /usr/lib/jvm/java-11-openjdk-amd64
     steps:
     - uses: actions/checkout@v4
     
-    - name: Set up Java
-      uses: actions/setup-java@v3
-      with:
-        distribution: 'temurin'
-        java-version: '17'
+    - name: Set up Java 11
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y openjdk-11-jdk
+        java -version
     
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -29,58 +30,45 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install buildozer Cython==0.29.33
-        sudo apt-get update
         sudo apt-get install -y git zip unzip python3-pip autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev
         sudo apt-get install -y libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev
         sudo apt-get install -y libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev zlib1g-dev
         sudo apt-get install -y android-tools-adb android-tools-fastboot
     
-    - name: Setup Android SDK and Build Tools
+    - name: Setup Android SDK
       run: |
-        BUILD_TOOLS_VERSION="33.0.0"
-        TEMP_DIR="/tmp/android_sdk"
+        # Set up Android SDK root
+        mkdir -p ${ANDROID_HOME}
         
-        # Create all required directories
-        mkdir -p "${ANDROID_HOME}"/{cmdline-tools/latest,platforms,platform-tools,tools/bin,build-tools/${BUILD_TOOLS_VERSION}}
-        
-        # Download and extract command line tools
-        mkdir -p "${TEMP_DIR}"
-        cd "${TEMP_DIR}"
+        # Download the command-line tools
         wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
         unzip -q commandlinetools-linux-9477386_latest.zip
         
-        # Move files to the correct locations
-        cp -r cmdline-tools/* "${ANDROID_HOME}/cmdline-tools/latest/"
-        cp "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" "${ANDROID_HOME}/tools/bin/"
+        # Create the expected directory structure
+        mkdir -p ${ANDROID_HOME}/cmdline-tools/latest
+        mv cmdline-tools/* ${ANDROID_HOME}/cmdline-tools/latest/
         
         # Set executable permissions
-        chmod +x "${ANDROID_HOME}/cmdline-tools/latest/bin/"*
-        chmod +x "${ANDROID_HOME}/tools/bin/sdkmanager"
+        chmod +x ${ANDROID_HOME}/cmdline-tools/latest/bin/*
         
-        # Accept licenses and install components
-        yes | "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" --sdk_root="${ANDROID_HOME}" --licenses
+        # Create tools directory structure (for buildozer compatibility)
+        mkdir -p ${ANDROID_HOME}/tools/bin
+        ln -s ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager ${ANDROID_HOME}/tools/bin/sdkmanager
         
-        # Install required components
-        "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" --sdk_root="${ANDROID_HOME}" \
+        # Accept licenses and install required components
+        export PATH=${ANDROID_HOME}/cmdline-tools/latest/bin:$PATH
+        yes | sdkmanager --licenses --sdk_root=${ANDROID_HOME}
+        sdkmanager --sdk_root=${ANDROID_HOME} \
             "platform-tools" \
-            "build-tools;${BUILD_TOOLS_VERSION}" \
-            "platforms;android-33"
+            "platforms;android-33" \
+            "build-tools;33.0.0" \
+            "extras;android;m2repository" \
+            "extras;google;m2repository"
         
-        # Set permissions
-        sudo chown -R $USER:$USER "${ANDROID_HOME}"
-        
-        # Verify installations and directory structure
-        echo "Verifying directory structure..."
-        /bin/ls -R "${ANDROID_HOME}"
-        
-        echo "Verifying key executables..."
-        /bin/ls -la "${ANDROID_HOME}/tools/bin/sdkmanager"
-        /bin/ls -la "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager"
-        /bin/ls -la "${ANDROID_HOME}/platform-tools/adb"
-        /bin/ls -la "${ANDROID_HOME}/build-tools/${BUILD_TOOLS_VERSION}/aidl"
-        
-        # Clean up
-        rm -rf "${TEMP_DIR}"
+        # Verify installation
+        ls -la ${ANDROID_HOME}/tools/bin/sdkmanager
+        ls -la ${ANDROID_HOME}/platform-tools/
+        ls -la ${ANDROID_HOME}/build-tools/33.0.0/
     
     - name: Set up buildozer
       run: |
@@ -102,7 +90,7 @@ jobs:
         echo 'android.ndk = 25b' >> buildozer.spec
         echo 'android.accept_sdk_license = True' >> buildozer.spec
         echo "android.sdk_path = ${ANDROID_HOME}" >> buildozer.spec
-        echo "android.sdk = 33" >> buildozer.spec
+        echo 'android.skip_update = True' >> buildozer.spec
         echo '' >> buildozer.spec
         echo 'android.presplash_color = #FFFFFF' >> buildozer.spec
         echo 'android.orientation = portrait' >> buildozer.spec
@@ -112,18 +100,19 @@ jobs:
         echo 'warn_on_root = 1' >> buildozer.spec
     
     - name: Build with Buildozer
+      env:
+        PATH: ${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools:${PATH}
       run: |
-        # Ensure all required paths are in PATH
-        export PATH="${ANDROID_HOME}/tools/bin:${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools:$PATH"
+        export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+        export PATH=$JAVA_HOME/bin:$PATH
         
-        # Debug information
+        echo "Java version:"
+        java -version
+        
         echo "ANDROID_HOME: ${ANDROID_HOME}"
+        echo "JAVA_HOME: ${JAVA_HOME}"
         echo "PATH: $PATH"
-        echo "Current directory: $(/bin/pwd)"
-        echo "SDK Manager location:"
-        find "${ANDROID_HOME}" -name sdkmanager
         
-        # Build
         buildozer android debug -v
     
     - name: Upload APK
