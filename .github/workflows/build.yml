@@ -33,26 +33,42 @@ jobs:
         sudo apt-get install -y libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev zlib1g-dev
         sudo apt-get install -y android-tools-adb android-tools-fastboot
     
-    - name: Setup Android SDK
+    - name: Setup Android SDK and Build Tools
       run: |
+        # Set up Android SDK
         ANDROID_SDK_ROOT="/usr/local/lib/android/sdk"
         CMDLINE_TOOLS_ROOT="${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin"
+        BUILD_TOOLS_VERSION="33.0.0"
         
+        # Download and install command line tools
         sudo wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
         sudo mkdir -p ${ANDROID_SDK_ROOT}/cmdline-tools
         sudo unzip -q commandlinetools-linux-9477386_latest.zip -d ${ANDROID_SDK_ROOT}/cmdline-tools
         sudo mv ${ANDROID_SDK_ROOT}/cmdline-tools/cmdline-tools ${ANDROID_SDK_ROOT}/cmdline-tools/latest
         
+        # Set up environment variables
         export ANDROID_HOME=${ANDROID_SDK_ROOT}
         export PATH=${PATH}:${CMDLINE_TOOLS_ROOT}
         
+        # Accept licenses and install components
         yes | sudo ${CMDLINE_TOOLS_ROOT}/sdkmanager --licenses
-        sudo ${CMDLINE_TOOLS_ROOT}/sdkmanager --install "build-tools;33.0.0" "platforms;android-33" "platform-tools"
+        sudo ${CMDLINE_TOOLS_ROOT}/sdkmanager --install "build-tools;${BUILD_TOOLS_VERSION}" "platforms;android-33" "platform-tools"
+        
+        # Set up buildozer paths
+        mkdir -p $HOME/.buildozer/android/platform/android-sdk
+        sudo ln -s ${ANDROID_SDK_ROOT}/build-tools/${BUILD_TOOLS_VERSION} $HOME/.buildozer/android/platform/android-sdk/build-tools
+        sudo ln -s ${ANDROID_SDK_ROOT}/platforms $HOME/.buildozer/android/platform/android-sdk/platforms
+        sudo ln -s ${ANDROID_SDK_ROOT}/platform-tools $HOME/.buildozer/android/platform/android-sdk/platform-tools
+        
+        # Verify aidl exists
+        ls -la ${ANDROID_SDK_ROOT}/build-tools/${BUILD_TOOLS_VERSION}/aidl
+        ls -la $HOME/.buildozer/android/platform/android-sdk/build-tools/${BUILD_TOOLS_VERSION}/aidl
+        
+        # Set permissions
+        sudo chown -R $USER:$USER $HOME/.buildozer
     
     - name: Set up buildozer
       run: |
-        mkdir -p $HOME/.buildozer
-        sudo chown -R $USER:$USER $HOME/.buildozer
         echo '[app]' > buildozer.spec
         echo 'title = Yoga Timer' >> buildozer.spec
         echo 'package.name = yogatimer' >> buildozer.spec
@@ -69,6 +85,7 @@ jobs:
         echo 'android.api = 33' >> buildozer.spec
         echo 'android.minapi = 21' >> buildozer.spec
         echo 'android.ndk = 25b' >> buildozer.spec
+        echo 'android.accept_sdk_license = True' >> buildozer.spec
         echo '' >> buildozer.spec
         echo 'android.presplash_color = #FFFFFF' >> buildozer.spec
         echo 'android.orientation = portrait' >> buildozer.spec
@@ -78,6 +95,8 @@ jobs:
         echo 'warn_on_root = 1' >> buildozer.spec
     
     - name: Build with Buildozer
+      env:
+        BUILDOZER_ANDROID_SDK: $HOME/.buildozer/android/platform/android-sdk
       run: |
         buildozer android debug
     
