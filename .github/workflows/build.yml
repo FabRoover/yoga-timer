@@ -9,6 +9,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      ANDROID_HOME: /home/runner/.buildozer/android/platform/android-sdk
     steps:
     - uses: actions/checkout@v4
     
@@ -35,10 +37,8 @@ jobs:
     
     - name: Setup Android SDK and Build Tools
       run: |
-        # Set up Android SDK
         BUILD_TOOLS_VERSION="33.0.0"
-        ANDROID_HOME="$HOME/.buildozer/android/platform/android-sdk"
-        TEMP_DIR="$HOME/temp_android_sdk"
+        TEMP_DIR="/tmp/android_sdk"
         
         # Create main SDK directory
         mkdir -p "${ANDROID_HOME}"
@@ -52,17 +52,6 @@ jobs:
         # Create the expected directory structure
         mkdir -p "${ANDROID_HOME}/cmdline-tools/latest"
         mv cmdline-tools/* "${ANDROID_HOME}/cmdline-tools/latest/"
-        
-        # Set environment variables
-        export ANDROID_HOME="${ANDROID_HOME}"
-        export PATH="${ANDROID_HOME}/cmdline-tools/latest/bin:${PATH}"
-        
-        # Verify sdkmanager exists
-        if [ ! -f "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" ]; then
-            echo "sdkmanager not found!"
-            ls -la "${ANDROID_HOME}/cmdline-tools/latest/bin/"
-            exit 1
-        fi
         
         # Set executable permissions
         chmod +x "${ANDROID_HOME}/cmdline-tools/latest/bin/"*
@@ -81,12 +70,11 @@ jobs:
         
         # Verify installations
         echo "Verifying installations..."
-        ls -la "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager"
-        ls -la "${ANDROID_HOME}/platform-tools/adb" || echo "adb not found"
-        ls -la "${ANDROID_HOME}/build-tools/${BUILD_TOOLS_VERSION}/aidl" || echo "aidl not found"
+        /bin/ls -la "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager"
+        /bin/ls -la "${ANDROID_HOME}/platform-tools/adb" || echo "adb not found"
+        /bin/ls -la "${ANDROID_HOME}/build-tools/${BUILD_TOOLS_VERSION}/aidl" || echo "aidl not found"
         
         # Clean up
-        cd $HOME
         rm -rf "${TEMP_DIR}"
     
     - name: Set up buildozer
@@ -108,7 +96,7 @@ jobs:
         echo 'android.minapi = 21' >> buildozer.spec
         echo 'android.ndk = 25b' >> buildozer.spec
         echo 'android.accept_sdk_license = True' >> buildozer.spec
-        echo "android.sdk_path = $HOME/.buildozer/android/platform/android-sdk" >> buildozer.spec
+        echo "android.sdk_path = ${ANDROID_HOME}" >> buildozer.spec
         echo '' >> buildozer.spec
         echo 'android.presplash_color = #FFFFFF' >> buildozer.spec
         echo 'android.orientation = portrait' >> buildozer.spec
@@ -118,15 +106,13 @@ jobs:
         echo 'warn_on_root = 1' >> buildozer.spec
     
     - name: Build with Buildozer
-      env:
-        ANDROID_HOME: $HOME/.buildozer/android/platform/android-sdk
-        PATH: $HOME/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin:$PATH
       run: |
-        echo "ANDROID_HOME: $ANDROID_HOME"
+        export PATH="${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools:$PATH"
+        echo "ANDROID_HOME: ${ANDROID_HOME}"
         echo "PATH: $PATH"
-        echo "Current directory: $(pwd)"
+        echo "Current directory: $(/bin/pwd)"
         echo "Android SDK contents:"
-        ls -R $ANDROID_HOME
+        /bin/ls -R "${ANDROID_HOME}"
         buildozer android debug -v
     
     - name: Upload APK
