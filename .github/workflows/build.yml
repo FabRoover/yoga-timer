@@ -60,28 +60,32 @@ jobs:
 
     - name: Setup Android SDK
       run: |
-        # Create base directory
-        mkdir -p "${ANDROID_HOME}"
-        cd "${ANDROID_HOME}"
+        # Create temporary directory for download
+        TEMP_DIR="/tmp/android_cmdline_tools"
+        mkdir -p "${TEMP_DIR}"
+        cd "${TEMP_DIR}"
         
         # Download and extract command line tools
         wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
         unzip -q commandlinetools-linux-9477386_latest.zip
         
-        # Create the required directory structure
-        mkdir -p "${ANDROID_HOME}/cmdline-tools/latest"
+        # Create SDK directory structure
+        mkdir -p "${ANDROID_HOME}/cmdline-tools"
         mkdir -p "${ANDROID_HOME}/tools/bin"
         
-        # Move files to the correct location
-        cp -r cmdline-tools/* "${ANDROID_HOME}/cmdline-tools/latest/"
-        rm -rf cmdline-tools
+        # Move the files to the correct location
+        mv cmdline-tools "${ANDROID_HOME}/cmdline-tools/latest"
         
-        # Create symlinks
+        # Create symbolic links
         ln -sf "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" "${ANDROID_HOME}/tools/bin/sdkmanager"
         
         # Set permissions
         chmod +x "${ANDROID_HOME}/cmdline-tools/latest/bin"/*
         chmod +x "${ANDROID_HOME}/tools/bin"/*
+        
+        # Clean up temporary directory
+        cd
+        rm -rf "${TEMP_DIR}"
         
         # Verify directory structure
         echo "Directory structure:"
@@ -101,8 +105,8 @@ jobs:
         # Set ownership
         sudo chown -R $USER:$USER "${ANDROID_HOME}"
         
-        # Verify installation
-        echo "Verifying installation..."
+        # Final verification
+        echo "Verifying final setup:"
         ls -la "${ANDROID_HOME}/tools/bin/sdkmanager"
         ls -la "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager"
 
@@ -144,7 +148,6 @@ jobs:
         echo "=== Environment Verification ==="
         echo "ANDROID_HOME: ${ANDROID_HOME}"
         echo "PATH: ${PATH}"
-        echo "Current directory: $(pwd)"
         echo "SDK directory contents:"
         ls -R "${ANDROID_HOME}"
         buildozer android debug -v
