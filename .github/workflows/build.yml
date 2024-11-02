@@ -40,8 +40,8 @@ jobs:
         BUILD_TOOLS_VERSION="33.0.0"
         TEMP_DIR="/tmp/android_sdk"
         
-        # Create main SDK directory
-        mkdir -p "${ANDROID_HOME}"
+        # Create all required directories
+        mkdir -p "${ANDROID_HOME}"/{cmdline-tools/latest,platforms,platform-tools,tools/bin,build-tools/${BUILD_TOOLS_VERSION}}
         
         # Download and extract command line tools
         mkdir -p "${TEMP_DIR}"
@@ -49,14 +49,15 @@ jobs:
         wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
         unzip -q commandlinetools-linux-9477386_latest.zip
         
-        # Create the expected directory structure
-        mkdir -p "${ANDROID_HOME}/cmdline-tools/latest"
-        mv cmdline-tools/* "${ANDROID_HOME}/cmdline-tools/latest/"
+        # Move files to the correct locations
+        cp -r cmdline-tools/* "${ANDROID_HOME}/cmdline-tools/latest/"
+        cp "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" "${ANDROID_HOME}/tools/bin/"
         
         # Set executable permissions
         chmod +x "${ANDROID_HOME}/cmdline-tools/latest/bin/"*
+        chmod +x "${ANDROID_HOME}/tools/bin/sdkmanager"
         
-        # Accept licenses
+        # Accept licenses and install components
         yes | "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" --sdk_root="${ANDROID_HOME}" --licenses
         
         # Install required components
@@ -68,11 +69,15 @@ jobs:
         # Set permissions
         sudo chown -R $USER:$USER "${ANDROID_HOME}"
         
-        # Verify installations
-        echo "Verifying installations..."
+        # Verify installations and directory structure
+        echo "Verifying directory structure..."
+        /bin/ls -R "${ANDROID_HOME}"
+        
+        echo "Verifying key executables..."
+        /bin/ls -la "${ANDROID_HOME}/tools/bin/sdkmanager"
         /bin/ls -la "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager"
-        /bin/ls -la "${ANDROID_HOME}/platform-tools/adb" || echo "adb not found"
-        /bin/ls -la "${ANDROID_HOME}/build-tools/${BUILD_TOOLS_VERSION}/aidl" || echo "aidl not found"
+        /bin/ls -la "${ANDROID_HOME}/platform-tools/adb"
+        /bin/ls -la "${ANDROID_HOME}/build-tools/${BUILD_TOOLS_VERSION}/aidl"
         
         # Clean up
         rm -rf "${TEMP_DIR}"
@@ -97,6 +102,7 @@ jobs:
         echo 'android.ndk = 25b' >> buildozer.spec
         echo 'android.accept_sdk_license = True' >> buildozer.spec
         echo "android.sdk_path = ${ANDROID_HOME}" >> buildozer.spec
+        echo "android.sdk = 33" >> buildozer.spec
         echo '' >> buildozer.spec
         echo 'android.presplash_color = #FFFFFF' >> buildozer.spec
         echo 'android.orientation = portrait' >> buildozer.spec
@@ -107,12 +113,17 @@ jobs:
     
     - name: Build with Buildozer
       run: |
-        export PATH="${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools:$PATH"
+        # Ensure all required paths are in PATH
+        export PATH="${ANDROID_HOME}/tools/bin:${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools:$PATH"
+        
+        # Debug information
         echo "ANDROID_HOME: ${ANDROID_HOME}"
         echo "PATH: $PATH"
         echo "Current directory: $(/bin/pwd)"
-        echo "Android SDK contents:"
-        /bin/ls -R "${ANDROID_HOME}"
+        echo "SDK Manager location:"
+        find "${ANDROID_HOME}" -name sdkmanager
+        
+        # Build
         buildozer android debug -v
     
     - name: Upload APK
