@@ -35,14 +35,29 @@ jobs:
     
     - name: Setup Android SDK
       run: |
+        ANDROID_SDK_ROOT="/usr/local/lib/android/sdk"
+        CMDLINE_TOOLS_ROOT="${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin"
+        
+        # Download and install command line tools
         wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
-        sudo mkdir -p /usr/local/lib/android/sdk/cmdline-tools
-        sudo unzip commandlinetools-linux-9477386_latest.zip -d /usr/local/lib/android/sdk/cmdline-tools
-        sudo mv /usr/local/lib/android/sdk/cmdline-tools/cmdline-tools /usr/local/lib/android/sdk/cmdline-tools/latest
-        export ANDROID_HOME=/usr/local/lib/android/sdk
-        export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin
-        yes | sdkmanager --licenses
-        sdkmanager "build-tools;33.0.0" "platforms;android-33" "platform-tools"
+        sudo mkdir -p ${ANDROID_SDK_ROOT}/cmdline-tools
+        sudo unzip -q commandlinetools-linux-9477386_latest.zip -d ${ANDROID_SDK_ROOT}/cmdline-tools
+        sudo mv ${ANDROID_SDK_ROOT}/cmdline-tools/cmdline-tools ${ANDROID_SDK_ROOT}/cmdline-tools/latest
+        
+        # Set environment variables
+        export ANDROID_HOME=${ANDROID_SDK_ROOT}
+        export PATH=${PATH}:${CMDLINE_TOOLS_ROOT}
+        
+        # Accept licenses and install required components
+        yes | sudo ${CMDLINE_TOOLS_ROOT}/sdkmanager --licenses
+        sudo ${CMDLINE_TOOLS_ROOT}/sdkmanager --install "build-tools;33.0.0" "platforms;android-33" "platform-tools"
+        
+        # Create symlinks for buildtools
+        sudo mkdir -p ~/.buildozer/android/platform/android-sdk/build-tools
+        sudo ln -s ${ANDROID_SDK_ROOT}/build-tools/33.0.0 ~/.buildozer/android/platform/android-sdk/build-tools/33.0.0
+        
+        # Verify installation
+        ls -la ~/.buildozer/android/platform/android-sdk/build-tools/33.0.0/aidl || true
     
     - name: Build with Buildozer
       run: |
