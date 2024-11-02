@@ -19,7 +19,7 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y openjdk-11-jdk
-        java -version
+        /usr/bin/java -version
 
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -55,47 +55,39 @@ jobs:
           virtualenv \
           build-essential
         
-        python -m pip install --upgrade pip setuptools wheel
-        pip install --upgrade Cython==0.29.33 buildozer==1.5.0
+        /usr/bin/python3 -m pip install --upgrade pip setuptools wheel
+        /usr/bin/python3 -m pip install --upgrade Cython==0.29.33 buildozer==1.5.0
 
     - name: Setup Android SDK
       run: |
         # Create temporary directory for download
         TEMP_DIR="/tmp/android_cmdline_tools"
-        mkdir -p "${TEMP_DIR}"
+        /usr/bin/mkdir -p "${TEMP_DIR}"
         cd "${TEMP_DIR}"
         
         # Download and extract command line tools
-        wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
-        unzip -q commandlinetools-linux-9477386_latest.zip
+        /usr/bin/wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
+        /usr/bin/unzip -q commandlinetools-linux-9477386_latest.zip
         
         # Create SDK directory structure
-        mkdir -p "${ANDROID_HOME}/cmdline-tools"
-        mkdir -p "${ANDROID_HOME}/tools/bin"
+        /usr/bin/mkdir -p "${ANDROID_HOME}/cmdline-tools"
+        /usr/bin/mkdir -p "${ANDROID_HOME}/tools/bin"
         
         # Move the files to the correct location
-        mv cmdline-tools "${ANDROID_HOME}/cmdline-tools/latest"
+        /usr/bin/mv cmdline-tools "${ANDROID_HOME}/cmdline-tools/latest"
         
         # Create symbolic links
-        ln -sf "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" "${ANDROID_HOME}/tools/bin/sdkmanager"
+        /usr/bin/ln -sf "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" "${ANDROID_HOME}/tools/bin/sdkmanager"
         
         # Set permissions
-        chmod +x "${ANDROID_HOME}/cmdline-tools/latest/bin"/*
-        chmod +x "${ANDROID_HOME}/tools/bin"/*
+        /usr/bin/chmod +x "${ANDROID_HOME}/cmdline-tools/latest/bin"/*
+        /usr/bin/chmod +x "${ANDROID_HOME}/tools/bin"/*
         
         # Clean up temporary directory
-        cd
-        rm -rf "${TEMP_DIR}"
-        
-        # Verify directory structure
-        echo "Directory structure:"
-        ls -R "${ANDROID_HOME}"
+        cd /home/runner/work/yoga-timer/yoga-timer
+        /usr/bin/rm -rf "${TEMP_DIR}"
         
         # Accept licenses and install SDK components
-        yes | "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" \
-          --sdk_root="${ANDROID_HOME}" \
-          --licenses
-        
         "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" \
           --sdk_root="${ANDROID_HOME}" \
           "platform-tools" \
@@ -103,54 +95,55 @@ jobs:
           "build-tools;33.0.0"
         
         # Set ownership
-        sudo chown -R $USER:$USER "${ANDROID_HOME}"
+        sudo /usr/bin/chown -R $USER:$USER "${ANDROID_HOME}"
         
-        # Final verification
-        echo "Verifying final setup:"
-        ls -la "${ANDROID_HOME}/tools/bin/sdkmanager"
-        ls -la "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager"
+        # Verify final setup
+        /usr/bin/find "${ANDROID_HOME}" -type f -name "sdkmanager"
 
     - name: Setup buildozer.spec
       run: |
-        echo '[app]' > buildozer.spec
-        echo 'title = Yoga Timer' >> buildozer.spec
-        echo 'package.name = yogatimer' >> buildozer.spec
-        echo 'package.domain = org.example' >> buildozer.spec
-        echo 'source.dir = .' >> buildozer.spec
-        echo 'source.include_exts = py,wav,toml' >> buildozer.spec
-        echo 'version = 0.1' >> buildozer.spec
-        echo '' >> buildozer.spec
-        echo 'requirements = python3,kivy==2.2.1,plyer,android' >> buildozer.spec
-        echo '' >> buildozer.spec
-        echo 'android.permissions = INTERNET,WRITE_EXTERNAL_STORAGE' >> buildozer.spec
-        echo 'p4a.bootstrap = sdl2' >> buildozer.spec
-        echo 'android.archs = arm64-v8a' >> buildozer.spec
-        echo 'android.api = 33' >> buildozer.spec
-        echo 'android.minapi = 21' >> buildozer.spec
-        echo 'android.ndk = 25b' >> buildozer.spec
-        echo 'android.accept_sdk_license = True' >> buildozer.spec
-        echo 'android.skip_update = True' >> buildozer.spec
-        echo "android.sdk_path = ${ANDROID_HOME}" >> buildozer.spec
-        echo 'android.gradle_dependencies = androidx.core:core:1.6.0' >> buildozer.spec
-        echo 'android.enable_androidx = True' >> buildozer.spec
-        echo '' >> buildozer.spec
-        echo 'android.presplash_color = #FFFFFF' >> buildozer.spec
-        echo 'android.orientation = portrait' >> buildozer.spec
-        echo '' >> buildozer.spec
-        echo '[buildozer]' >> buildozer.spec
-        echo 'log_level = 2' >> buildozer.spec
-        echo 'warn_on_root = 1' >> buildozer.spec
+        cat > buildozer.spec << EOF
+[app]
+title = Yoga Timer
+package.name = yogatimer
+package.domain = org.example
+source.dir = .
+source.include_exts = py,wav,toml
+version = 0.1
+
+requirements = python3,kivy==2.2.1,plyer,android
+
+android.permissions = INTERNET,WRITE_EXTERNAL_STORAGE
+p4a.bootstrap = sdl2
+android.archs = arm64-v8a
+android.api = 33
+android.minapi = 21
+android.ndk = 25b
+android.accept_sdk_license = True
+android.skip_update = True
+android.sdk_path = $ANDROID_HOME
+android.gradle_dependencies = androidx.core:core:1.6.0
+android.enable_androidx = True
+
+android.presplash_color = #FFFFFF
+android.orientation = portrait
+
+[buildozer]
+log_level = 2
+warn_on_root = 1
+EOF
 
     - name: Build APK
       env:
-        PATH: ${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/tools/bin:${ANDROID_HOME}/platform-tools:${PATH}
+        PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/tools/bin:${ANDROID_HOME}/platform-tools
       run: |
         echo "=== Environment Verification ==="
         echo "ANDROID_HOME: ${ANDROID_HOME}"
         echo "PATH: ${PATH}"
+        echo "Current directory: $(/usr/bin/pwd)"
         echo "SDK directory contents:"
-        ls -R "${ANDROID_HOME}"
-        buildozer android debug -v
+        /usr/bin/find "${ANDROID_HOME}" -ls
+        /usr/local/bin/buildozer android debug -v
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
