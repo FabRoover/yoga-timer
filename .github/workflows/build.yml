@@ -40,52 +40,54 @@ jobs:
         ANDROID_HOME="$HOME/.buildozer/android/platform/android-sdk"
         TEMP_DIR="$HOME/temp_android_sdk"
         
-        # Create directories
-        mkdir -p ${ANDROID_HOME}/{tools,platforms,platform-tools,build-tools/${BUILD_TOOLS_VERSION}}
-        mkdir -p ${TEMP_DIR}
+        # Create main SDK directory
+        mkdir -p "${ANDROID_HOME}"
         
-        # Download and extract command line tools to temporary directory
-        cd ${TEMP_DIR}
+        # Download and extract command line tools
+        mkdir -p "${TEMP_DIR}"
+        cd "${TEMP_DIR}"
         wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
         unzip -q commandlinetools-linux-9477386_latest.zip
         
-        # Move tools to correct location
-        rm -rf ${ANDROID_HOME}/tools
-        mv cmdline-tools ${ANDROID_HOME}/tools
-        
-        # Set permissions
-        sudo chown -R $USER:$USER ${ANDROID_HOME}
-        chmod +x ${ANDROID_HOME}/tools/bin/*
+        # Create the expected directory structure
+        mkdir -p "${ANDROID_HOME}/cmdline-tools/latest"
+        mv cmdline-tools/* "${ANDROID_HOME}/cmdline-tools/latest/"
         
         # Set environment variables
-        export ANDROID_HOME=${ANDROID_HOME}
-        export PATH=${PATH}:${ANDROID_HOME}/tools/bin
+        export ANDROID_HOME="${ANDROID_HOME}"
+        export PATH="${ANDROID_HOME}/cmdline-tools/latest/bin:${PATH}"
         
         # Verify sdkmanager exists
-        if [ ! -f "${ANDROID_HOME}/tools/bin/sdkmanager" ]; then
+        if [ ! -f "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" ]; then
             echo "sdkmanager not found!"
+            ls -la "${ANDROID_HOME}/cmdline-tools/latest/bin/"
             exit 1
         fi
         
-        # Accept licenses and install components
-        yes | ${ANDROID_HOME}/tools/bin/sdkmanager --licenses || true
-        ${ANDROID_HOME}/tools/bin/sdkmanager --update
+        # Set executable permissions
+        chmod +x "${ANDROID_HOME}/cmdline-tools/latest/bin/"*
+        
+        # Accept licenses
+        yes | "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" --sdk_root="${ANDROID_HOME}" --licenses
         
         # Install required components
-        ${ANDROID_HOME}/tools/bin/sdkmanager "platform-tools" "build-tools;${BUILD_TOOLS_VERSION}" "platforms;android-33"
+        "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" --sdk_root="${ANDROID_HOME}" \
+            "platform-tools" \
+            "build-tools;${BUILD_TOOLS_VERSION}" \
+            "platforms;android-33"
+        
+        # Set permissions
+        sudo chown -R $USER:$USER "${ANDROID_HOME}"
         
         # Verify installations
-        for file in "${ANDROID_HOME}/tools/bin/sdkmanager" "${ANDROID_HOME}/platform-tools/adb" "${ANDROID_HOME}/build-tools/${BUILD_TOOLS_VERSION}/aidl"; do
-            if [ ! -f "$file" ]; then
-                echo "Required file not found: $file"
-                exit 1
-            fi
-            echo "Found: $file"
-        done
+        echo "Verifying installations..."
+        ls -la "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager"
+        ls -la "${ANDROID_HOME}/platform-tools/adb" || echo "adb not found"
+        ls -la "${ANDROID_HOME}/build-tools/${BUILD_TOOLS_VERSION}/aidl" || echo "aidl not found"
         
         # Clean up
         cd $HOME
-        rm -rf ${TEMP_DIR}
+        rm -rf "${TEMP_DIR}"
     
     - name: Set up buildozer
       run: |
@@ -118,7 +120,7 @@ jobs:
     - name: Build with Buildozer
       env:
         ANDROID_HOME: $HOME/.buildozer/android/platform/android-sdk
-        PATH: $PATH:$HOME/.buildozer/android/platform/android-sdk/tools/bin
+        PATH: $HOME/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin:$PATH
       run: |
         echo "ANDROID_HOME: $ANDROID_HOME"
         echo "PATH: $PATH"
