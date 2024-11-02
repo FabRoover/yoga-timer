@@ -60,46 +60,51 @@ jobs:
 
     - name: Setup Android SDK
       run: |
-        # Create directory structure
-        mkdir -p "${ANDROID_HOME}"/{cmdline-tools,platforms,platform-tools,build-tools,tools/bin}
+        # Create base directory
+        mkdir -p "${ANDROID_HOME}"
+        cd "${ANDROID_HOME}"
         
         # Download and extract command line tools
-        cd "${ANDROID_HOME}"
         wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
         unzip -q commandlinetools-linux-9477386_latest.zip
         
-        # Move tools to correct location
-        mv cmdline-tools/* cmdline-tools/latest || mkdir -p cmdline-tools/latest
-        
-        # Create necessary symlinks
+        # Create the required directory structure
+        mkdir -p "${ANDROID_HOME}/cmdline-tools/latest"
         mkdir -p "${ANDROID_HOME}/tools/bin"
-        ln -sf "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" "${ANDROID_HOME}/tools/bin/"
         
-        # Set execution permissions
-        chmod +x "${ANDROID_HOME}/cmdline-tools/latest/bin/"*
-        chmod +x "${ANDROID_HOME}/tools/bin/"*
+        # Move files to the correct location
+        cp -r cmdline-tools/* "${ANDROID_HOME}/cmdline-tools/latest/"
+        rm -rf cmdline-tools
         
-        # Verify sdkmanager exists and is executable
-        ls -la "${ANDROID_HOME}/tools/bin/sdkmanager"
+        # Create symlinks
+        ln -sf "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" "${ANDROID_HOME}/tools/bin/sdkmanager"
+        
+        # Set permissions
+        chmod +x "${ANDROID_HOME}/cmdline-tools/latest/bin"/*
+        chmod +x "${ANDROID_HOME}/tools/bin"/*
+        
+        # Verify directory structure
+        echo "Directory structure:"
+        ls -R "${ANDROID_HOME}"
         
         # Accept licenses and install SDK components
-        yes | "${ANDROID_HOME}/tools/bin/sdkmanager" --sdk_root="${ANDROID_HOME}" --licenses
-        "${ANDROID_HOME}/tools/bin/sdkmanager" --sdk_root="${ANDROID_HOME}" \
+        yes | "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" \
+          --sdk_root="${ANDROID_HOME}" \
+          --licenses
+        
+        "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" \
+          --sdk_root="${ANDROID_HOME}" \
           "platform-tools" \
           "platforms;android-33" \
           "build-tools;33.0.0"
         
-        # Set permissions
+        # Set ownership
         sudo chown -R $USER:$USER "${ANDROID_HOME}"
-
-    - name: Verify Android SDK
-      run: |
-        echo "Checking SDK installation..."
+        
+        # Verify installation
+        echo "Verifying installation..."
         ls -la "${ANDROID_HOME}/tools/bin/sdkmanager"
-        echo "SDK Manager version:"
-        "${ANDROID_HOME}/tools/bin/sdkmanager" --version
-        echo "Installed packages:"
-        "${ANDROID_HOME}/tools/bin/sdkmanager" --list --sdk_root="${ANDROID_HOME}"
+        ls -la "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager"
 
     - name: Setup buildozer.spec
       run: |
@@ -134,13 +139,14 @@ jobs:
 
     - name: Build APK
       env:
-        ANDROID_HOME: /home/runner/.buildozer/android/platform/android-sdk
-        PATH: /home/runner/.buildozer/android/platform/android-sdk/tools/bin:/home/runner/.buildozer/android/platform/android-sdk/platform-tools:$PATH
+        PATH: ${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/tools/bin:${ANDROID_HOME}/platform-tools:${PATH}
       run: |
-        echo "Current PATH: $PATH"
-        echo "ANDROID_HOME: $ANDROID_HOME"
-        echo "Verifying sdkmanager:"
-        ls -la $ANDROID_HOME/tools/bin/sdkmanager
+        echo "=== Environment Verification ==="
+        echo "ANDROID_HOME: ${ANDROID_HOME}"
+        echo "PATH: ${PATH}"
+        echo "Current directory: $(pwd)"
+        echo "SDK directory contents:"
+        ls -R "${ANDROID_HOME}"
         buildozer android debug -v
 
     - name: Upload APK
