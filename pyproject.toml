@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "yogatimer"
+version = "0.1"
+description = "A Yoga Timer Application"
+requires-python = ">=3.9"
+dependencies = [
+    "kivy",
+    "plyer",
+]

@@ -12,7 +12,6 @@ jobs:
     env:
       ANDROID_HOME: /home/runner/.buildozer/android/platform/android-sdk
       JAVA_HOME: /usr/lib/jvm/java-11-openjdk-amd64
-      PATH: /usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools
     steps:
     - uses: actions/checkout@v4
     
@@ -54,18 +53,10 @@ jobs:
           libavformat-dev \
           libavcodec-dev \
           virtualenv \
-          build-essential \
-          ccache
+          build-essential
         
-        # Verify git installation
-        git --version
-        
-        # Install Python packages
-        python -m pip install --upgrade pip
+        python -m pip install --upgrade pip setuptools wheel
         pip install --upgrade Cython==0.29.33 buildozer==1.5.0
-        
-        # Verify buildozer installation
-        buildozer --version
 
     - name: Setup Android SDK
       run: |
@@ -75,15 +66,16 @@ jobs:
         mkdir -p ${ANDROID_HOME}/cmdline-tools/latest
         mv cmdline-tools/* ${ANDROID_HOME}/cmdline-tools/latest/
         rm -rf cmdline-tools
-        mkdir -p ${ANDROID_HOME}/tools/bin
-        ln -s ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager ${ANDROID_HOME}/tools/bin/sdkmanager
-        chmod +x ${ANDROID_HOME}/cmdline-tools/latest/bin/*
-        sudo chown -R $USER:$USER ${ANDROID_HOME}
-        yes | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --sdk_root=${ANDROID_HOME} --licenses
-        ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --sdk_root=${ANDROID_HOME} \
+        
+        export PATH="${ANDROID_HOME}/cmdline-tools/latest/bin:${PATH}"
+        
+        yes | sdkmanager --licenses --sdk_root="${ANDROID_HOME}"
+        sdkmanager --sdk_root="${ANDROID_HOME}" \
           "platform-tools" \
           "platforms;android-33" \
-          "build-tools;33.0.0"
+          "build-tools;33.0.0" \
+          "extras;android;m2repository" \
+          "extras;google;m2repository"
 
     - name: Setup buildozer.spec
       run: |
@@ -92,10 +84,10 @@ jobs:
         echo 'package.name = yogatimer' >> buildozer.spec
         echo 'package.domain = org.example' >> buildozer.spec
         echo 'source.dir = .' >> buildozer.spec
-        echo 'source.include_exts = py,wav' >> buildozer.spec
+        echo 'source.include_exts = py,wav,toml' >> buildozer.spec
         echo 'version = 0.1' >> buildozer.spec
         echo '' >> buildozer.spec
-        echo 'requirements = python3,kivy,plyer,android,Cython==0.29.33' >> buildozer.spec
+        echo 'requirements = python3,kivy==2.2.1,plyer,android' >> buildozer.spec
         echo '' >> buildozer.spec
         echo 'android.permissions = INTERNET,WRITE_EXTERNAL_STORAGE' >> buildozer.spec
         echo 'p4a.bootstrap = sdl2' >> buildozer.spec
@@ -106,6 +98,8 @@ jobs:
         echo 'android.accept_sdk_license = True' >> buildozer.spec
         echo 'android.skip_update = True' >> buildozer.spec
         echo "android.sdk_path = ${ANDROID_HOME}" >> buildozer.spec
+        echo 'android.gradle_dependencies = androidx.core:core:1.6.0' >> buildozer.spec
+        echo 'android.enable_androidx = True' >> buildozer.spec
         echo '' >> buildozer.spec
         echo 'android.presplash_color = #FFFFFF' >> buildozer.spec
         echo 'android.orientation = portrait' >> buildozer.spec
@@ -114,27 +108,9 @@ jobs:
         echo 'log_level = 2' >> buildozer.spec
         echo 'warn_on_root = 1' >> buildozer.spec
 
-    - name: Verify environment
-      run: |
-        echo "=== System Path ==="
-        echo $PATH
-        echo "=== Git Version and Location ==="
-        which git
-        git --version
-        echo "=== Android SDK Location ==="
-        echo $ANDROID_HOME
-        ls -la $ANDROID_HOME
-        echo "=== Java Version ==="
-        java -version
-        echo $JAVA_HOME
-        echo "=== Python Version ==="
-        python --version
-        pip list
-        echo "=== Buildozer Version ==="
-        buildozer --version
-
     - name: Build APK
       run: |
+        export PATH="${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools:${PATH}"
         buildozer android debug -v
 
     - name: Upload APK
