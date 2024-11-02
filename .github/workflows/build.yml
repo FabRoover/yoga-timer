@@ -29,74 +29,33 @@ jobs:
     
     - name: Install system dependencies
       run: |
-        # Update package list
         sudo apt-get update
+        sudo apt-get install -y git zip unzip openjdk-11-jdk python3-pip autoconf libtool pkg-config
+        sudo apt-get install -y zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev
+        sudo apt-get install -y libssl-dev libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev
+        sudo apt-get install -y libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev virtualenv
+        sudo apt-get install -y build-essential ccache
         
-        # Install essential packages
-        sudo apt-get install -y \
-          git \
-          zip \
-          unzip \
-          openjdk-11-jdk \
-          python3-pip \
-          autoconf \
-          libtool \
-          pkg-config \
-          zlib1g-dev \
-          libncurses5-dev \
-          libncursesw5-dev \
-          libtinfo5 \
-          cmake \
-          libffi-dev \
-          libssl-dev \
-          libsdl2-dev \
-          libsdl2-image-dev \
-          libsdl2-mixer-dev \
-          libsdl2-ttf-dev \
-          libportmidi-dev \
-          libswscale-dev \
-          libavformat-dev \
-          libavcodec-dev \
-          virtualenv \
-          build-essential \
-          ccache
-          
-        # Create symbolic link for git in /usr/bin if it doesn't exist
         sudo ln -sf $(which git) /usr/bin/git
-        
-        # Verify git installation
         which git
         git --version
         
-        # Install Python packages
         python -m pip install --upgrade pip
         pip install --upgrade Cython==0.29.33 buildozer==1.5.0
-        
-        # Verify buildozer installation
         buildozer --version
 
     - name: Setup Android SDK
       run: |
         mkdir -p ${ANDROID_HOME}
-        
-        # Download and extract command line tools
         wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
         unzip -q commandlinetools-linux-9477386_latest.zip
-        
-        # Create proper directory structure
         mkdir -p ${ANDROID_HOME}/cmdline-tools/latest
         mv cmdline-tools/* ${ANDROID_HOME}/cmdline-tools/latest/
         rm -rf cmdline-tools
-        
-        # Create tools directory structure
         mkdir -p ${ANDROID_HOME}/tools/bin
         ln -s ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager ${ANDROID_HOME}/tools/bin/sdkmanager
-        
-        # Set permissions
         chmod +x ${ANDROID_HOME}/cmdline-tools/latest/bin/*
         sudo chown -R $USER:$USER ${ANDROID_HOME}
-        
-        # Install SDK components
         yes | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --sdk_root=${ANDROID_HOME} --licenses
         ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --sdk_root=${ANDROID_HOME} \
           "platform-tools" \
@@ -105,56 +64,49 @@ jobs:
 
     - name: Setup buildozer.spec
       run: |
-        cat > buildozer.spec << EOF
-[app]
-title = Yoga Timer
-package.name = yogatimer
-package.domain = org.example
-source.dir = .
-source.include_exts = py,wav
-version = 0.1
-
-requirements = python3,kivy,plyer,android,Cython==0.29.33
-
-android.permissions = INTERNET,WRITE_EXTERNAL_STORAGE
-p4a.bootstrap = sdl2
-android.archs = arm64-v8a
-android.api = 33
-android.minapi = 21
-android.ndk = 25b
-android.accept_sdk_license = True
-android.skip_update = True
-android.sdk_path = ${ANDROID_HOME}
-
-android.presplash_color = #FFFFFF
-android.orientation = portrait
-
-[buildozer]
-log_level = 2
-warn_on_root = 1
-EOF
+        echo '[app]' > buildozer.spec
+        echo 'title = Yoga Timer' >> buildozer.spec
+        echo 'package.name = yogatimer' >> buildozer.spec
+        echo 'package.domain = org.example' >> buildozer.spec
+        echo 'source.dir = .' >> buildozer.spec
+        echo 'source.include_exts = py,wav' >> buildozer.spec
+        echo 'version = 0.1' >> buildozer.spec
+        echo '' >> buildozer.spec
+        echo 'requirements = python3,kivy,plyer,android,Cython==0.29.33' >> buildozer.spec
+        echo '' >> buildozer.spec
+        echo 'android.permissions = INTERNET,WRITE_EXTERNAL_STORAGE' >> buildozer.spec
+        echo 'p4a.bootstrap = sdl2' >> buildozer.spec
+        echo 'android.archs = arm64-v8a' >> buildozer.spec
+        echo 'android.api = 33' >> buildozer.spec
+        echo 'android.minapi = 21' >> buildozer.spec
+        echo 'android.ndk = 25b' >> buildozer.spec
+        echo 'android.accept_sdk_license = True' >> buildozer.spec
+        echo 'android.skip_update = True' >> buildozer.spec
+        echo "android.sdk_path = ${ANDROID_HOME}" >> buildozer.spec
+        echo '' >> buildozer.spec
+        echo 'android.presplash_color = #FFFFFF' >> buildozer.spec
+        echo 'android.orientation = portrait' >> buildozer.spec
+        echo '' >> buildozer.spec
+        echo '[buildozer]' >> buildozer.spec
+        echo 'log_level = 2' >> buildozer.spec
+        echo 'warn_on_root = 1' >> buildozer.spec
 
     - name: Verify environment
       run: |
         echo "=== System Path ==="
         echo $PATH
-        
         echo "=== Git Version and Location ==="
         which git
         git --version
-        
         echo "=== Android SDK Location ==="
         echo $ANDROID_HOME
         ls -la $ANDROID_HOME
-        
         echo "=== Java Version ==="
         java -version
         echo $JAVA_HOME
-        
         echo "=== Python Version ==="
         python --version
         pip list
-        
         echo "=== Buildozer Version ==="
         buildozer --version
 
