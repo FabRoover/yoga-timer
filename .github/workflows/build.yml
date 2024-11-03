@@ -11,8 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       ANDROID_HOME: /home/runner/.buildozer/android/platform/android-sdk
+      ANDROID_NDK_HOME: /home/runner/.buildozer/android/platform/android-ndk-r25b
       JAVA_HOME: /usr/lib/jvm/java-11-openjdk-amd64
-      # Comprehensive PATH to prevent recurring issues
       PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools
     steps:
     - uses: actions/checkout@v4
@@ -30,7 +30,6 @@ jobs:
     
     - name: Install and verify system dependencies
       run: |
-        # Install dependencies
         sudo apt-get update
         sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
           git \
@@ -56,27 +55,19 @@ jobs:
           libavformat-dev \
           libavcodec-dev \
           virtualenv \
-          build-essential
+          build-essential \
+          wget \
+          gradle
         
-        # Verify critical dependencies
-        echo "Verifying critical dependencies..."
-        which git
-        git --version
-        which python3
-        python3 --version
-        which java
-        java -version
-        
-        # Install Python packages
         python3 -m pip install --upgrade pip setuptools wheel
         python3 -m pip install --upgrade Cython==0.29.33 buildozer==1.5.0
         
-        # Create buildozer directory structure
         mkdir -p /home/runner/.buildozer
         sudo chown -R $USER:$USER /home/runner/.buildozer
 
-    - name: Set up Android SDK
+    - name: Set up Android SDK and NDK
       run: |
+        # Set up SDK
         mkdir -p ${ANDROID_HOME}/cmdline-tools
         cd ${ANDROID_HOME}/cmdline-tools
         
@@ -84,30 +75,31 @@ jobs:
         unzip -q commandlinetools-linux-9477386_latest.zip
         mv cmdline-tools latest
         
-        # Create SDK directory structure required by buildozer
-        mkdir -p ${ANDROID_HOME}/licenses
-        mkdir -p ${ANDROID_HOME}/tools/bin
+        mkdir -p ${ANDROID_HOME}/licenses ${ANDROID_HOME}/tools/bin
         
-        # Accept licenses
         echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > ${ANDROID_HOME}/licenses/android-sdk-license
         echo "d56f5187479451eabf01fb78af6dfcb131a6481e" >> ${ANDROID_HOME}/licenses/android-sdk-license
         
-        # Install required components
+        # Install SDK components
         ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --sdk_root=${ANDROID_HOME} \
           "platform-tools" \
           "platforms;android-33" \
-          "build-tools;33.0.0"
+          "build-tools;33.0.0" \
+          "ndk;25.1.8937393"
         
-        # Create required symlinks
         ln -s ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager ${ANDROID_HOME}/tools/bin/sdkmanager
         
-        # Set permissions
-        sudo chown -R $USER:$USER ${ANDROID_HOME}
+        # Set up NDK
+        mkdir -p ${ANDROID_NDK_HOME}
+        ln -s ${ANDROID_HOME}/ndk/25.1.8937393/* ${ANDROID_NDK_HOME}/
         
-        # Verify installation
-        echo "Verifying Android SDK installation..."
+        # Set permissions
+        sudo chown -R $USER:$USER ${ANDROID_HOME} ${ANDROID_NDK_HOME}
+        
+        # Verify installations
+        echo "SDK/NDK Verification:"
         ls -la ${ANDROID_HOME}/tools/bin/sdkmanager
-        ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --list --sdk_root=${ANDROID_HOME}
+        ls -la ${ANDROID_NDK_HOME}/toolchains || echo "NDK toolchains not found"
 
     - name: Setup buildozer.spec
       run: |
@@ -126,7 +118,8 @@ jobs:
         echo 'android.archs = arm64-v8a' >> buildozer.spec
         echo 'android.api = 33' >> buildozer.spec
         echo 'android.minapi = 21' >> buildozer.spec
-        echo 'android.ndk = 25b' >> buildozer.spec
+        echo 'android.ndk = 25.1.8937393' >> buildozer.spec
+        echo 'android.ndk_path = /home/runner/.buildozer/android/platform/android-ndk-r25b' >> buildozer.spec
         echo 'android.accept_sdk_license = True' >> buildozer.spec
         echo 'android.skip_update = True' >> buildozer.spec
         echo "android.sdk_path = ${ANDROID_HOME}" >> buildozer.spec
@@ -141,18 +134,18 @@ jobs:
         echo 'warn_on_root = 1' >> buildozer.spec
 
     - name: Build APK
+      env:
+        GRADLE_OPTS: "-Dorg.gradle.daemon=false"
       run: |
-        # Verify environment before build
-        echo "=== Pre-build Environment Verification ==="
+        echo "=== Pre-build Verification ==="
         echo "ANDROID_HOME: ${ANDROID_HOME}"
+        echo "ANDROID_NDK_HOME: ${ANDROID_NDK_HOME}"
         echo "PATH: $PATH"
-        echo "Current Directory: $(pwd)"
-        echo "Git version: $(git --version)"
-        echo "Python version: $(python3 --version)"
-        echo "Java version: $(java -version 2>&1)"
-        echo "Buildozer version: $(buildozer --version)"
+        echo "Gradle version: $(gradle --version)"
+        echo "SDK/NDK contents:"
+        ls -R ${ANDROID_HOME}/ndk
+        ls -R ${ANDROID_NDK_HOME}
         
-        # Run buildozer with verbose output
         buildozer android debug -v
 
     - name: Upload APK
