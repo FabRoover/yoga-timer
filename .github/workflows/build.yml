@@ -9,126 +9,46 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      ANDROID_HOME: /home/runner/.buildozer/android/platform/android-sdk
-      ANDROID_NDK_HOME: /home/runner/.buildozer/android/platform/android-ndk-r25b
-      JAVA_HOME: /usr/lib/jvm/java-11-openjdk-amd64
+    container:
+      image: kivy/buildozer:latest
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Java 11
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y openjdk-11-jdk
-
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.9'
-    
-    - name: Install dependencies
-      run: |
-        sudo apt-get update
-        sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-          git zip unzip python3-pip autoconf libtool pkg-config \
-          zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake \
-          libffi-dev libssl-dev libsdl2-dev libsdl2-image-dev \
-          libsdl2-mixer-dev libsdl2-ttf-dev libportmidi-dev libswscale-dev \
-          libavformat-dev libavcodec-dev virtualenv build-essential wget
-        
-        python3 -m pip install --upgrade pip setuptools wheel
-        python3 -m pip install --upgrade Cython==0.29.33
-        python3 -m pip install --upgrade buildozer==1.5.0
-
-    - name: Set up Android SDK and NDK
-      run: |
-        # Create the directory structure
-        mkdir -p ${ANDROID_HOME}/{tools/bin,cmdline-tools,platforms,platform-tools,build-tools}
-        mkdir -p ${ANDROID_NDK_HOME}
-        
-        # Download and setup SDK
-        wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
-        unzip -q commandlinetools-linux-9477386_latest.zip
-        mv cmdline-tools ${ANDROID_HOME}/cmdline-tools/latest
-        ln -sf ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager ${ANDROID_HOME}/tools/bin/sdkmanager
-        chmod +x ${ANDROID_HOME}/cmdline-tools/latest/bin/*
-        chmod +x ${ANDROID_HOME}/tools/bin/*
-        
-        # Download and setup NDK
-        echo "Downloading NDK..."
-        wget -q https://dl.google.com/android/repository/android-ndk-r25b-linux.zip
-        echo "Extracting NDK..."
-        unzip -q android-ndk-r25b-linux.zip
-        mv android-ndk-r25b/* ${ANDROID_NDK_HOME}/
-        rm -rf android-ndk-r25b android-ndk-r25b-linux.zip
-        
-        # Accept licenses and install SDK components
-        mkdir -p ${ANDROID_HOME}/licenses
-        echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > ${ANDROID_HOME}/licenses/android-sdk-license
-        
-        # Install SDK components
-        ${ANDROID_HOME}/tools/bin/sdkmanager --sdk_root=${ANDROID_HOME} \
-          "platform-tools" \
-          "platforms;android-33" \
-          "build-tools;33.0.0"
-        
-        # Set permissions
-        sudo chown -R $USER:$USER ${ANDROID_HOME}
-        sudo chown -R $USER:$USER ${ANDROID_NDK_HOME}
-        
-        # Verify installations
-        echo "=== SDK Directory Structure ==="
-        ls -R ${ANDROID_HOME}
-        echo "=== NDK Directory Structure ==="
-        ls -R ${ANDROID_NDK_HOME} | head -n 20
-
-    - name: Create buildozer.spec
-      run: |
-        echo '[app]' > buildozer.spec
-        echo 'title = Yoga Timer' >> buildozer.spec
-        echo 'package.name = yogatimer' >> buildozer.spec
-        echo 'package.domain = org.example' >> buildozer.spec
-        echo 'source.dir = .' >> buildozer.spec
-        echo 'source.include_exts = py,wav' >> buildozer.spec
-        echo 'version = 0.1' >> buildozer.spec
-        echo '' >> buildozer.spec
-        echo 'requirements = python3,kivy==2.2.1,plyer,android' >> buildozer.spec
-        echo '' >> buildozer.spec
-        echo 'android.permissions = INTERNET,WRITE_EXTERNAL_STORAGE' >> buildozer.spec
-        echo 'p4a.bootstrap = sdl2' >> buildozer.spec
-        echo 'android.archs = arm64-v8a' >> buildozer.spec
-        echo 'android.api = 33' >> buildozer.spec
-        echo 'android.minapi = 21' >> buildozer.spec
-        echo 'android.ndk = r25b' >> buildozer.spec
-        echo 'android.ndk_path = /home/runner/.buildozer/android/platform/android-ndk-r25b' >> buildozer.spec
-        echo 'android.accept_sdk_license = True' >> buildozer.spec
-        echo "android.sdk_path = ${ANDROID_HOME}" >> buildozer.spec
-        echo 'android.gradle_dependencies = androidx.core:core:1.6.0' >> buildozer.spec
-        echo 'android.enable_androidx = True' >> buildozer.spec
-        echo '' >> buildozer.spec
-        echo 'android.presplash_color = #FFFFFF' >> buildozer.spec
-        echo 'android.orientation = portrait' >> buildozer.spec
-        echo '' >> buildozer.spec
-        echo '[buildozer]' >> buildozer.spec
-        echo 'log_level = 2' >> buildozer.spec
-        echo 'warn_on_root = 1' >> buildozer.spec
-
-    - name: Build APK
-      run: |
-        # Verify environment before build
-        echo "=== Environment Verification ==="
-        echo "ANDROID_HOME: ${ANDROID_HOME}"
-        echo "ANDROID_NDK_HOME: ${ANDROID_NDK_HOME}"
-        echo "PATH: $PATH"
-        echo "SDK Manager location:"
-        ls -l ${ANDROID_HOME}/tools/bin/sdkmanager
-        echo "NDK location:"
-        ls -l ${ANDROID_NDK_HOME}
-        
-        buildozer android debug -v
-
-    - name: Upload APK
-      uses: actions/upload-artifact@v4
-      with:
-        name: app
-        path: bin/*.apk
+      - uses: actions/checkout@v4
+      
+      - name: Build APK
+        run: |
+          # Set up buildozer.spec
+          echo '[app]' > buildozer.spec
+          echo 'title = Yoga Timer' >> buildozer.spec
+          echo 'package.name = yogatimer' >> buildozer.spec
+          echo 'package.domain = org.example' >> buildozer.spec
+          echo 'source.dir = .' >> buildozer.spec
+          echo 'source.include_exts = py,wav' >> buildozer.spec
+          echo 'version = 0.1' >> buildozer.spec
+          echo '' >> buildozer.spec
+          echo 'requirements = python3,kivy==2.2.1,plyer,android' >> buildozer.spec
+          echo '' >> buildozer.spec
+          echo 'android.permissions = INTERNET,WRITE_EXTERNAL_STORAGE' >> buildozer.spec
+          echo 'p4a.bootstrap = sdl2' >> buildozer.spec
+          echo 'android.archs = arm64-v8a' >> buildozer.spec
+          echo 'android.api = 33' >> buildozer.spec
+          echo 'android.minapi = 21' >> buildozer.spec
+          echo 'android.ndk = r25b' >> buildozer.spec
+          echo 'android.accept_sdk_license = True' >> buildozer.spec
+          echo 'android.gradle_dependencies = androidx.core:core:1.6.0' >> buildozer.spec
+          echo 'android.enable_androidx = True' >> buildozer.spec
+          echo '' >> buildozer.spec
+          echo 'android.presplash_color = #FFFFFF' >> buildozer.spec
+          echo 'android.orientation = portrait' >> buildozer.spec
+          echo '' >> buildozer.spec
+          echo '[buildozer]' >> buildozer.spec
+          echo 'log_level = 2' >> buildozer.spec
+          echo 'warn_on_root = 1' >> buildozer.spec
+          
+          # Build the APK
+          buildozer android debug
+          
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app
+          path: bin/*.apk
