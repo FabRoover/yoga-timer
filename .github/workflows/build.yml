@@ -18,16 +18,38 @@ jobs:
         with:
           python-version: '3.9'
 
-      - name: Set up build environment
+      - name: Install system dependencies
         run: |
+          # Update package lists
           sudo apt-get update
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
-            python3-pip \
+          
+          # Install base dependencies first
+          sudo apt-get install -y --no-install-recommends \
             build-essential \
+            ccache \
             git \
-            python3 \
+            libunwind-dev \
             python3-dev \
-            ffmpeg \
+            python3-pip \
+            python3-setuptools \
+            wget
+          
+          # Install additional dependencies
+          sudo apt-get install -y --no-install-recommends \
+            libssl-dev \
+            libffi-dev \
+            libltdl-dev \
+            libtool \
+            autoconf \
+            pkg-config \
+            zlib1g-dev \
+            libncurses5-dev \
+            libncursesw5-dev \
+            libtinfo5 \
+            cmake
+          
+          # Install SDL and media dependencies
+          sudo apt-get install -y --no-install-recommends \
             libsdl2-dev \
             libsdl2-image-dev \
             libsdl2-mixer-dev \
@@ -35,24 +57,18 @@ jobs:
             libportmidi-dev \
             libswscale-dev \
             libavformat-dev \
-            libavcodec-dev \
-            zlib1g-dev \
-            libgstreamer1.0 \
-            gstreamer1.0-plugins-base \
-            gstreamer1.0-plugins-good
+            libavcodec-dev
           
-          # Create directories and set permissions
-          sudo mkdir -p bin .buildozer
-          sudo chown -R $USER:$USER .
-          sudo chmod -R 755 .
+          # Verify installations
+          dpkg -l | grep -E 'libsdl2|python3|build-essential'
 
       - name: Install Python packages
         run: |
-          python -m pip install --upgrade pip
-          pip install --upgrade Cython==0.29.33
-          pip install --user --upgrade buildozer
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install --upgrade Cython==0.29.33
+          python -m pip install --user --upgrade buildozer==1.5.0
 
-      - name: Verify buildozer installation
+      - name: Verify installations
         run: |
           echo "Python version:"
           python --version
@@ -60,8 +76,8 @@ jobs:
           pip --version
           echo "Buildozer version:"
           python -m buildozer --version
-          echo "Buildozer location:"
-          which buildozer
+          echo "Installed pip packages:"
+          pip list
 
       - name: Configure buildozer
         run: |
@@ -92,8 +108,14 @@ jobs:
           echo "log_level = 2" >> buildozer.spec
           echo "warn_on_root = 1" >> buildozer.spec
 
+      - name: Set up build environment
+        run: |
+          mkdir -p bin .buildozer
+          sudo chown -R $USER:$USER .
+          sudo chmod -R 755 .
+
       - name: Build APK
-        run: python -m buildozer android debug
+        run: python -m buildozer android debug -v
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
