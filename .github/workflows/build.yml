@@ -1,135 +1,21 @@
 name: Build
-on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
-  workflow_dispatch:
+on: [push, pull_request, workflow_dispatch]
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Build with Buildozer
+        uses: ArtemSBulgakov/buildozer-action@v1
+        id: buildozer
         with:
-          python-version: '3.9'
+          workdir: .
+          buildozer_version: stable
 
-      - name: Install system dependencies
-        run: |
-          # Update package lists
-          sudo apt-get update
-          
-          # Install base dependencies first
-          sudo apt-get install -y --no-install-recommends \
-            build-essential \
-            ccache \
-            git \
-            libunwind-dev \
-            python3-dev \
-            python3-pip \
-            python3-setuptools \
-            wget
-          
-          # Install additional dependencies
-          sudo apt-get install -y --no-install-recommends \
-            libssl-dev \
-            libffi-dev \
-            libltdl-dev \
-            libtool \
-            autoconf \
-            pkg-config \
-            zlib1g-dev \
-            libncurses5-dev \
-            libncursesw5-dev \
-            libtinfo5 \
-            cmake
-          
-          # Install SDL and media dependencies
-          sudo apt-get install -y --no-install-recommends \
-            libsdl2-dev \
-            libsdl2-image-dev \
-            libsdl2-mixer-dev \
-            libsdl2-ttf-dev \
-            libportmidi-dev \
-            libswscale-dev \
-            libavformat-dev \
-            libavcodec-dev
-          
-          # Verify installations
-          dpkg -l | grep -E 'libsdl2|python3|build-essential'
-
-      - name: Install Python packages
-        run: |
-          python -m pip install --upgrade pip setuptools wheel
-          python -m pip install --upgrade Cython==0.29.33
-          python -m pip install --user --upgrade buildozer==1.5.0
-
-      - name: Verify installations
-        run: |
-          echo "Python version:"
-          python --version
-          echo "Pip version:"
-          pip --version
-          echo "Buildozer version:"
-          python -m buildozer --version
-          echo "Installed pip packages:"
-          pip list
-
-      - name: Configure buildozer
-        run: |
-          echo "[app]" > buildozer.spec
-          echo "title = Yoga Timer" >> buildozer.spec
-          echo "package.name = yogatimer" >> buildozer.spec
-          echo "package.domain = org.example" >> buildozer.spec
-          echo "source.dir = ." >> buildozer.spec
-          echo "source.include_exts = py,wav" >> buildozer.spec
-          echo "version = 0.1" >> buildozer.spec
-          echo "" >> buildozer.spec
-          echo "requirements = python3,kivy==2.2.1,plyer,android" >> buildozer.spec
-          echo "" >> buildozer.spec
-          echo "android.permissions = INTERNET,WRITE_EXTERNAL_STORAGE" >> buildozer.spec
-          echo "p4a.bootstrap = sdl2" >> buildozer.spec
-          echo "android.archs = arm64-v8a" >> buildozer.spec
-          echo "android.api = 33" >> buildozer.spec
-          echo "android.minapi = 21" >> buildozer.spec
-          echo "android.ndk = r25b" >> buildozer.spec
-          echo "android.accept_sdk_license = True" >> buildozer.spec
-          echo "android.gradle_dependencies = androidx.core:core:1.6.0" >> buildozer.spec
-          echo "android.enable_androidx = True" >> buildozer.spec
-          echo "" >> buildozer.spec
-          echo "android.presplash_color = #FFFFFF" >> buildozer.spec
-          echo "android.orientation = portrait" >> buildozer.spec
-          echo "" >> buildozer.spec
-          echo "[buildozer]" >> buildozer.spec
-          echo "log_level = 2" >> buildozer.spec
-          echo "warn_on_root = 1" >> buildozer.spec
-
-      - name: Set up build environment
-        run: |
-          mkdir -p bin .buildozer
-          sudo chown -R $USER:$USER .
-          sudo chmod -R 755 .
-
-      - name: Build APK
-        run: python -m buildozer android debug -v
-
-      - name: Upload APK
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
-        if: success()
         with:
-          name: app
-          path: bin/*.apk
-          if-no-files-found: error
-
-      - name: Upload logs on failure
-        uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: build-logs
-          path: |
-            .buildozer/android/build.log
-            .buildozer/android/platform/*/build/*.log
+          name: package
+          path: ${{ steps.buildozer.outputs.filename }}
