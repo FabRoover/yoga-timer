@@ -12,6 +12,8 @@ jobs:
     env:
       ANDROID_HOME: /home/runner/.buildozer/android/platform/android-sdk
       JAVA_HOME: /usr/lib/jvm/java-11-openjdk-amd64
+      # Comprehensive PATH to prevent recurring issues
+      PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools
     steps:
     - uses: actions/checkout@v4
     
@@ -19,15 +21,16 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y openjdk-11-jdk
-        /usr/bin/java -version
+        java -version
 
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
         python-version: '3.9'
     
-    - name: Install system dependencies
+    - name: Install and verify system dependencies
       run: |
+        # Install dependencies
         sudo apt-get update
         sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
           git \
@@ -55,8 +58,22 @@ jobs:
           virtualenv \
           build-essential
         
-        python -m pip install --upgrade pip setuptools wheel
-        pip install --upgrade Cython==0.29.33 buildozer==1.5.0
+        # Verify critical dependencies
+        echo "Verifying critical dependencies..."
+        which git
+        git --version
+        which python3
+        python3 --version
+        which java
+        java -version
+        
+        # Install Python packages
+        python3 -m pip install --upgrade pip setuptools wheel
+        python3 -m pip install --upgrade Cython==0.29.33 buildozer==1.5.0
+        
+        # Create buildozer directory structure
+        mkdir -p /home/runner/.buildozer
+        sudo chown -R $USER:$USER /home/runner/.buildozer
 
     - name: Set up Android SDK
       run: |
@@ -67,32 +84,29 @@ jobs:
         unzip -q commandlinetools-linux-9477386_latest.zip
         mv cmdline-tools latest
         
-        export PATH=${ANDROID_HOME}/cmdline-tools/latest/bin:$PATH
+        # Create SDK directory structure required by buildozer
+        mkdir -p ${ANDROID_HOME}/licenses
+        mkdir -p ${ANDROID_HOME}/tools/bin
         
         # Accept licenses
-        mkdir -p ${ANDROID_HOME}/licenses
         echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > ${ANDROID_HOME}/licenses/android-sdk-license
         echo "d56f5187479451eabf01fb78af6dfcb131a6481e" >> ${ANDROID_HOME}/licenses/android-sdk-license
         
         # Install required components
-        sdkmanager --sdk_root=${ANDROID_HOME} "platform-tools" "platforms;android-33" "build-tools;33.0.0"
+        ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --sdk_root=${ANDROID_HOME} \
+          "platform-tools" \
+          "platforms;android-33" \
+          "build-tools;33.0.0"
         
-        # Create tools directory structure required by buildozer
-        mkdir -p ${ANDROID_HOME}/tools/bin
+        # Create required symlinks
         ln -s ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager ${ANDROID_HOME}/tools/bin/sdkmanager
         
         # Set permissions
         sudo chown -R $USER:$USER ${ANDROID_HOME}
-
-    - name: Verify Android SDK
-      run: |
-        echo "=== SDK Directory Structure ==="
-        ls -R ${ANDROID_HOME}
         
-        echo "=== SDK Manager Version ==="
-        ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --version
-        
-        echo "=== Installed Packages ==="
+        # Verify installation
+        echo "Verifying Android SDK installation..."
+        ls -la ${ANDROID_HOME}/tools/bin/sdkmanager
         ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --list --sdk_root=${ANDROID_HOME}
 
     - name: Setup buildozer.spec
@@ -127,14 +141,18 @@ jobs:
         echo 'warn_on_root = 1' >> buildozer.spec
 
     - name: Build APK
-      env:
-        PATH: ${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools:${PATH}
       run: |
-        echo "=== Environment Verification ==="
+        # Verify environment before build
+        echo "=== Pre-build Environment Verification ==="
         echo "ANDROID_HOME: ${ANDROID_HOME}"
-        echo "PATH: ${PATH}"
+        echo "PATH: $PATH"
         echo "Current Directory: $(pwd)"
+        echo "Git version: $(git --version)"
+        echo "Python version: $(python3 --version)"
+        echo "Java version: $(java -version 2>&1)"
+        echo "Buildozer version: $(buildozer --version)"
         
+        # Run buildozer with verbose output
         buildozer android debug -v
 
     - name: Upload APK
