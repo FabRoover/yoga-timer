@@ -89,6 +89,16 @@ jobs:
           "build-tools;33.0.0" \
           "ndk;25.1.8937393"
 
+    - name: Create recipes directory
+      run: |
+        mkdir -p recipes/sdl2
+        echo 'from pythonforandroid.recipe import BootstrapNDKRecipe
+        
+        class SDL2Recipe(BootstrapNDKRecipe):
+            version = "2.28.3"
+            url = "https://github.com/libsdl-org/SDL/archive/refs/tags/release-{version}.zip"
+            depends = ["sdl2_image", "sdl2_mixer", "sdl2_ttf"]' > recipes/sdl2/__init__.py
+
     - name: Setup buildozer.spec
       run: |
         echo '[app]' > buildozer.spec
@@ -121,17 +131,6 @@ jobs:
         echo '[buildozer]' >> buildozer.spec
         echo 'log_level = 2' >> buildozer.spec
         echo 'warn_on_root = 1' >> buildozer.spec
-
-    - name: Create p4a local recipes
-      run: |
-        mkdir -p recipes
-        cat > recipes/sdl2/__init__.py << 'EOF'
-from pythonforandroid.recipe import BootstrapNDKRecipe
-class SDL2Recipe(BootstrapNDKRecipe):
-    version = "2.28.3"
-    url = "https://github.com/libsdl-org/SDL/archive/refs/tags/release-{version}.zip"
-    depends = ["sdl2_image", "sdl2_mixer", "sdl2_ttf"]
-EOF
 
     - name: Build APK
       run: |
