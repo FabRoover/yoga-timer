@@ -40,39 +40,47 @@ jobs:
         python3 -m pip install --upgrade Cython==0.29.33
         python3 -m pip install --upgrade buildozer==1.5.0
 
-    - name: Set up Android SDK
+    - name: Set up Android SDK and NDK
       run: |
-        # Create the directory structure that buildozer expects
-        mkdir -p ${ANDROID_HOME}
-        mkdir -p ${ANDROID_HOME}/tools/bin
-        mkdir -p ${ANDROID_HOME}/cmdline-tools
+        # Create the directory structure
+        mkdir -p ${ANDROID_HOME}/{tools/bin,cmdline-tools,platforms,platform-tools,build-tools}
+        mkdir -p ${ANDROID_NDK_HOME}
         
-        # Download and extract command line tools
+        # Download and setup SDK
         wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
         unzip -q commandlinetools-linux-9477386_latest.zip
-        
-        # Move files to the correct locations
         mv cmdline-tools ${ANDROID_HOME}/cmdline-tools/latest
-        
-        # Create the sdkmanager symlink that buildozer expects
         ln -sf ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager ${ANDROID_HOME}/tools/bin/sdkmanager
-        
-        # Set permissions
         chmod +x ${ANDROID_HOME}/cmdline-tools/latest/bin/*
         chmod +x ${ANDROID_HOME}/tools/bin/*
         
-        # Verify sdkmanager exists and is executable
-        ls -l ${ANDROID_HOME}/tools/bin/sdkmanager
+        # Download and setup NDK
+        echo "Downloading NDK..."
+        wget -q https://dl.google.com/android/repository/android-ndk-r25b-linux.zip
+        echo "Extracting NDK..."
+        unzip -q android-ndk-r25b-linux.zip
+        mv android-ndk-r25b/* ${ANDROID_NDK_HOME}/
+        rm -rf android-ndk-r25b android-ndk-r25b-linux.zip
         
         # Accept licenses and install SDK components
         mkdir -p ${ANDROID_HOME}/licenses
         echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > ${ANDROID_HOME}/licenses/android-sdk-license
         
-        ${ANDROID_HOME}/tools/bin/sdkmanager --sdk_root=${ANDROID_HOME} "platform-tools" "platforms;android-33" "build-tools;33.0.0"
+        # Install SDK components
+        ${ANDROID_HOME}/tools/bin/sdkmanager --sdk_root=${ANDROID_HOME} \
+          "platform-tools" \
+          "platforms;android-33" \
+          "build-tools;33.0.0"
         
-        # Verify installation
+        # Set permissions
+        sudo chown -R $USER:$USER ${ANDROID_HOME}
+        sudo chown -R $USER:$USER ${ANDROID_NDK_HOME}
+        
+        # Verify installations
         echo "=== SDK Directory Structure ==="
         ls -R ${ANDROID_HOME}
+        echo "=== NDK Directory Structure ==="
+        ls -R ${ANDROID_NDK_HOME} | head -n 20
 
     - name: Create buildozer.spec
       run: |
@@ -91,7 +99,8 @@ jobs:
         echo 'android.archs = arm64-v8a' >> buildozer.spec
         echo 'android.api = 33' >> buildozer.spec
         echo 'android.minapi = 21' >> buildozer.spec
-        echo 'android.ndk = 25.1.8937393' >> buildozer.spec
+        echo 'android.ndk = r25b' >> buildozer.spec
+        echo 'android.ndk_path = /home/runner/.buildozer/android/platform/android-ndk-r25b' >> buildozer.spec
         echo 'android.accept_sdk_license = True' >> buildozer.spec
         echo "android.sdk_path = ${ANDROID_HOME}" >> buildozer.spec
         echo 'android.gradle_dependencies = androidx.core:core:1.6.0' >> buildozer.spec
@@ -106,11 +115,15 @@ jobs:
 
     - name: Build APK
       run: |
+        # Verify environment before build
         echo "=== Environment Verification ==="
         echo "ANDROID_HOME: ${ANDROID_HOME}"
+        echo "ANDROID_NDK_HOME: ${ANDROID_NDK_HOME}"
         echo "PATH: $PATH"
         echo "SDK Manager location:"
         ls -l ${ANDROID_HOME}/tools/bin/sdkmanager
+        echo "NDK location:"
+        ls -l ${ANDROID_NDK_HOME}
         
         buildozer android debug -v
 
