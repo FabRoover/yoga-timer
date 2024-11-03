@@ -9,46 +9,129 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    container:
-      image: kivy/buildozer:latest
     steps:
-      - uses: actions/checkout@v4
-      
-      - name: Build APK
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up build environment
         run: |
-          # Set up buildozer.spec
-          echo '[app]' > buildozer.spec
-          echo 'title = Yoga Timer' >> buildozer.spec
-          echo 'package.name = yogatimer' >> buildozer.spec
-          echo 'package.domain = org.example' >> buildozer.spec
-          echo 'source.dir = .' >> buildozer.spec
-          echo 'source.include_exts = py,wav' >> buildozer.spec
-          echo 'version = 0.1' >> buildozer.spec
-          echo '' >> buildozer.spec
-          echo 'requirements = python3,kivy==2.2.1,plyer,android' >> buildozer.spec
-          echo '' >> buildozer.spec
-          echo 'android.permissions = INTERNET,WRITE_EXTERNAL_STORAGE' >> buildozer.spec
-          echo 'p4a.bootstrap = sdl2' >> buildozer.spec
-          echo 'android.archs = arm64-v8a' >> buildozer.spec
-          echo 'android.api = 33' >> buildozer.spec
-          echo 'android.minapi = 21' >> buildozer.spec
-          echo 'android.ndk = r25b' >> buildozer.spec
-          echo 'android.accept_sdk_license = True' >> buildozer.spec
-          echo 'android.gradle_dependencies = androidx.core:core:1.6.0' >> buildozer.spec
-          echo 'android.enable_androidx = True' >> buildozer.spec
-          echo '' >> buildozer.spec
-          echo 'android.presplash_color = #FFFFFF' >> buildozer.spec
-          echo 'android.orientation = portrait' >> buildozer.spec
-          echo '' >> buildozer.spec
-          echo '[buildozer]' >> buildozer.spec
-          echo 'log_level = 2' >> buildozer.spec
-          echo 'warn_on_root = 1' >> buildozer.spec
+          # Create all necessary directories with proper permissions
+          mkdir -p bin .buildozer
           
-          # Build the APK
-          buildozer android debug
+          # Set proper ownership and permissions for entire workspace
+          sudo chown -R 1000:1000 .
+          sudo chmod -R 755 .
           
+          # Verify directory structure
+          echo "=== Directory Structure ==="
+          ls -la
+          
+          # Create buildozer.spec first to verify write permissions
+          touch buildozer.spec
+          if [ ! -w buildozer.spec ]; then
+            echo "Permission test failed!"
+            exit 1
+          fi
+
+      - name: Create buildozer.spec
+        run: |
+          cat > buildozer.spec << 'SPEC'
+[app]
+title = Yoga Timer
+package.name = yogatimer
+package.domain = org.example
+source.dir = .
+source.include_exts = py,wav
+version = 0.1
+
+requirements = python3,kivy==2.2.1,plyer,android
+
+android.permissions = INTERNET,WRITE_EXTERNAL_STORAGE
+p4a.bootstrap = sdl2
+android.archs = arm64-v8a
+android.api = 33
+android.minapi = 21
+android.ndk = r25b
+android.accept_sdk_license = True
+android.gradle_dependencies = androidx.core:core:1.6.0
+android.enable_androidx = True
+
+android.presplash_color = #FFFFFF
+android.orientation = portrait
+
+[buildozer]
+log_level = 2
+warn_on_root = 1
+SPEC
+
+          # Verify spec file was created properly
+          if [ ! -f buildozer.spec ]; then
+            echo "Failed to create buildozer.spec!"
+            exit 1
+          fi
+          
+          echo "=== Buildozer.spec contents ==="
+          cat buildozer.spec
+
+      - name: Build APK in Docker
+        uses: docker://kivy/buildozer:latest
+        with:
+          options: -v ${{ github.workspace }}:/workspace:rw
+          entrypoint: /bin/bash
+          args: |
+            -c "
+            cd /workspace &&
+            buildozer android debug 2>&1 | tee build.log &&
+            if [ ! -f bin/*.apk ]; then
+              echo 'Build failed - no APK produced'
+              echo 'Build log:'
+              cat build.log
+              exit 1
+            fi"
+
+      - name: Verify build artifacts
+        run: |
+          echo "=== Checking build artifacts ==="
+          if [ ! -d "bin" ]; then
+            echo "bin directory not found!"
+            exit 1
+          fi
+          
+          echo "=== bin directory contents ==="
+          ls -la bin/
+          
+          if [ ! -f bin/*.apk ]; then
+            echo "No APK file found!"
+            exit 1
+          fi
+          
+          echo "=== APK file details ==="
+          ls -lh bin/*.apk
+
+      - name: Fix permissions after build
+        if: always()  # Run even if previous steps failed
+        run: |
+          sudo chown -R $(id -u):$(id -g) .
+          sudo chmod -R 755 .
+          echo "=== Final permission check ==="
+          ls -la
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
+        if: success()  # Only run if build succeeded
         with:
           name: app
           path: bin/*.apk
+          if-no-files-found: error  # Fail if no APK is found
+
+      - name: Upload build logs
+        uses: actions/upload-artifact@v4
+        if: failure()  # Run only if build failed
+        with:
+          name: build-logs
+          path: |
+            build.log
+            .buildozer/android/build.log
+            .buildozer/android/platform/*/build/*.log
