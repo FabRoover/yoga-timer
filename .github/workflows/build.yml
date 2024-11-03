@@ -26,84 +26,53 @@ jobs:
       with:
         python-version: '3.9'
     
-    - name: Install and verify system dependencies
+    - name: Install dependencies
       run: |
         sudo apt-get update
         sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-          git \
-          zip \
-          unzip \
-          python3-pip \
-          python3-setuptools \
-          python3-wheel \
-          autoconf \
-          libtool \
-          pkg-config \
-          zlib1g-dev \
-          libncurses5-dev \
-          libncursesw5-dev \
-          libtinfo5 \
-          cmake \
-          libffi-dev \
-          libssl-dev \
-          libsdl2-dev \
-          libsdl2-image-dev \
-          libsdl2-mixer-dev \
-          libsdl2-ttf-dev \
-          libportmidi-dev \
-          libswscale-dev \
-          libavformat-dev \
-          libavcodec-dev \
-          virtualenv \
-          build-essential \
-          wget \
-          curl
-
-        # Install Python packages
+          git zip unzip python3-pip autoconf libtool pkg-config \
+          zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake \
+          libffi-dev libssl-dev libsdl2-dev libsdl2-image-dev \
+          libsdl2-mixer-dev libsdl2-ttf-dev libportmidi-dev libswscale-dev \
+          libavformat-dev libavcodec-dev virtualenv build-essential wget
+        
         python3 -m pip install --upgrade pip setuptools wheel
         python3 -m pip install --upgrade Cython==0.29.33
         python3 -m pip install --upgrade buildozer==1.5.0
-        
-        # Create buildozer directory
-        mkdir -p /home/runner/.buildozer
-        sudo chown -R $USER:$USER /home/runner/.buildozer
 
-    - name: Set up Android SDK and NDK
+    - name: Set up Android SDK
       run: |
-        # Create directory structure
+        # Create the directory structure that buildozer expects
+        mkdir -p ${ANDROID_HOME}
+        mkdir -p ${ANDROID_HOME}/tools/bin
         mkdir -p ${ANDROID_HOME}/cmdline-tools
-        cd ${ANDROID_HOME}
         
-        # Download and set up SDK
+        # Download and extract command line tools
         wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
         unzip -q commandlinetools-linux-9477386_latest.zip
-        mv cmdline-tools latest
-        mkdir -p cmdline-tools
-        mv latest cmdline-tools/
-        rm commandlinetools-linux-9477386_latest.zip
         
-        # Set up licenses
-        mkdir -p ${ANDROID_HOME}/licenses
-        echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > ${ANDROID_HOME}/licenses/android-sdk-license
-        echo "d56f5187479451eabf01fb78af6dfcb131a6481e" >> ${ANDROID_HOME}/licenses/android-sdk-license
+        # Move files to the correct locations
+        mv cmdline-tools ${ANDROID_HOME}/cmdline-tools/latest
         
-        # Set PATH for sdkmanager
-        export PATH=${ANDROID_HOME}/cmdline-tools/latest/bin:$PATH
-        
-        # Accept licenses and install components
-        yes | sdkmanager --licenses --sdk_root=${ANDROID_HOME}
-        sdkmanager --sdk_root=${ANDROID_HOME} \
-          "platform-tools" \
-          "platforms;android-33" \
-          "build-tools;33.0.0" \
-          "ndk;25.1.8937393"
-        
-        # Set up NDK symlink
-        ln -s ${ANDROID_HOME}/ndk/25.1.8937393 ${ANDROID_NDK_HOME}
+        # Create the sdkmanager symlink that buildozer expects
+        ln -sf ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager ${ANDROID_HOME}/tools/bin/sdkmanager
         
         # Set permissions
-        sudo chown -R $USER:$USER ${ANDROID_HOME}
-        sudo chown -R $USER:$USER ${ANDROID_NDK_HOME}
+        chmod +x ${ANDROID_HOME}/cmdline-tools/latest/bin/*
+        chmod +x ${ANDROID_HOME}/tools/bin/*
+        
+        # Verify sdkmanager exists and is executable
+        ls -l ${ANDROID_HOME}/tools/bin/sdkmanager
+        
+        # Accept licenses and install SDK components
+        mkdir -p ${ANDROID_HOME}/licenses
+        echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > ${ANDROID_HOME}/licenses/android-sdk-license
+        
+        ${ANDROID_HOME}/tools/bin/sdkmanager --sdk_root=${ANDROID_HOME} "platform-tools" "platforms;android-33" "build-tools;33.0.0"
+        
+        # Verify installation
+        echo "=== SDK Directory Structure ==="
+        ls -R ${ANDROID_HOME}
 
     - name: Create buildozer.spec
       run: |
@@ -112,7 +81,7 @@ jobs:
         echo 'package.name = yogatimer' >> buildozer.spec
         echo 'package.domain = org.example' >> buildozer.spec
         echo 'source.dir = .' >> buildozer.spec
-        echo 'source.include_exts = py,wav,toml' >> buildozer.spec
+        echo 'source.include_exts = py,wav' >> buildozer.spec
         echo 'version = 0.1' >> buildozer.spec
         echo '' >> buildozer.spec
         echo 'requirements = python3,kivy==2.2.1,plyer,android' >> buildozer.spec
@@ -123,11 +92,8 @@ jobs:
         echo 'android.api = 33' >> buildozer.spec
         echo 'android.minapi = 21' >> buildozer.spec
         echo 'android.ndk = 25.1.8937393' >> buildozer.spec
-        echo 'android.ndk_api = 21' >> buildozer.spec
         echo 'android.accept_sdk_license = True' >> buildozer.spec
-        echo 'android.skip_update = True' >> buildozer.spec
         echo "android.sdk_path = ${ANDROID_HOME}" >> buildozer.spec
-        echo "android.ndk_path = ${ANDROID_NDK_HOME}" >> buildozer.spec
         echo 'android.gradle_dependencies = androidx.core:core:1.6.0' >> buildozer.spec
         echo 'android.enable_androidx = True' >> buildozer.spec
         echo '' >> buildozer.spec
@@ -138,34 +104,14 @@ jobs:
         echo 'log_level = 2' >> buildozer.spec
         echo 'warn_on_root = 1' >> buildozer.spec
 
-    - name: Prepare build environment
-      run: |
-        # Create build directories
-        mkdir -p .buildozer/android/platform/build-arm64-v8a
-        mkdir -p .buildozer/android/platform/python-for-android
-        
-        # Set permissions
-        sudo chown -R $USER:$USER .buildozer
-        
-        # Verify directories
-        echo "Build directories:"
-        ls -la .buildozer/android/platform/
-
     - name: Build APK
       run: |
-        export PATH=${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools:$PATH
-        export ANDROID_NDK_HOME=${ANDROID_HOME}/ndk/25.1.8937393
-        
         echo "=== Environment Verification ==="
         echo "ANDROID_HOME: ${ANDROID_HOME}"
-        echo "ANDROID_NDK_HOME: ${ANDROID_NDK_HOME}"
         echo "PATH: $PATH"
-        echo "Python version: $(python3 --version)"
-        echo "Java version: $(java -version 2>&1)"
-        echo "Buildozer version: $(buildozer --version)"
+        echo "SDK Manager location:"
+        ls -l ${ANDROID_HOME}/tools/bin/sdkmanager
         
-        # Clean and rebuild
-        rm -rf .buildozer/android/platform/build-*
         buildozer android debug -v
 
     - name: Upload APK
