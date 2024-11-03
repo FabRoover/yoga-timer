@@ -13,14 +13,55 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+
       - name: Set up build environment
         run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            python3-pip \
+            build-essential \
+            git \
+            python3 \
+            python3-dev \
+            ffmpeg \
+            libsdl2-dev \
+            libsdl2-image-dev \
+            libsdl2-mixer-dev \
+            libsdl2-ttf-dev \
+            libportmidi-dev \
+            libswscale-dev \
+            libavformat-dev \
+            libavcodec-dev \
+            zlib1g-dev \
+            libgstreamer1.0 \
+            gstreamer1.0-plugins-base \
+            gstreamer1.0-plugins-good
+          
+          # Create directories and set permissions
           sudo mkdir -p bin .buildozer
-          sudo chown -R $(id -u):$(id -g) .
+          sudo chown -R $USER:$USER .
           sudo chmod -R 755 .
-          touch buildozer.spec
-          sudo chown $(id -u):$(id -g) buildozer.spec
-          sudo chmod 644 buildozer.spec
+
+      - name: Install Python packages
+        run: |
+          python -m pip install --upgrade pip
+          pip install --upgrade Cython==0.29.33
+          pip install --user --upgrade buildozer
+
+      - name: Verify buildozer installation
+        run: |
+          echo "Python version:"
+          python --version
+          echo "Pip version:"
+          pip --version
+          echo "Buildozer version:"
+          python -m buildozer --version
+          echo "Buildozer location:"
+          which buildozer
 
       - name: Configure buildozer
         run: |
@@ -51,14 +92,8 @@ jobs:
           echo "log_level = 2" >> buildozer.spec
           echo "warn_on_root = 1" >> buildozer.spec
 
-      - name: Build with Docker
-        uses: docker://kivy/buildozer:latest
-        with:
-          args: android debug
-
-      - name: Fix permissions
-        if: always()
-        run: sudo chown -R $(id -u):$(id -g) .
+      - name: Build APK
+        run: python -m buildozer android debug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
